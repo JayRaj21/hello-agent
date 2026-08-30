@@ -1,243 +1,175 @@
 # hello-agent
 
-A small benchmark task for comparing coding-agent harnesses: give each
-harness the same buggy Python module and prompt, then grade the result
-with a script instead of eyeballing it.
+Give different AI coding-agent harnesses (Claude Code, `pi`, `opencode`, ...)
+the exact same small buggy task, then grade the result with a script instead
+of eyeballing it.
 
-Results from trials run so far: [`results/SUMMARY.md`](results/SUMMARY.md).
+📊 **Results so far:** [`results/SUMMARY.md`](results/SUMMARY.md)
 
-## Layout
+## Quickstart
 
-- `task/` -- what a harness actually receives: `logstats.py` (2 bugs
-  plus one docstring-only unimplemented rule), `tests/test_logstats.py`
-  (the visible test suite), and `sample.log` (a fixture for the CLI
-  smoke test).
-- `baseline/` -- a byte-identical pristine copy of `task/`, used by
-  `grading/grade.sh` as the diff/tamper reference. It is not a git tag;
-  harness working copies are plain directories and are often not git
-  repos at all.
-- `grading/hidden/test_spec.py` -- a hidden spec-conformance suite,
-  never given to a harness. It is injected into a harness's working
-  copy by `grade.sh` after the visible run.
-- `grading/grade.sh` -- the grader (see below).
-- `grading/selftest/` -- four prepared working copies
-  (`fixed/`, `naive_fixed/`, `tampered/`, `rewritten/`) used to
-  validate `grade.sh`'s own behavior, plus `run_selftest.sh`, which
-  runs the grader against all four and asserts on its output.
-  `grading/selftest/fixed/` is the reference solution.
-- `AGENT_PROMPT.md` -- the exact, harness-facing prompt text (repo
-  root, deliberately outside `task/` so it's never copied into a
-  harness's working copy or visible to its own file tools).
-- `PROMPT.md` -- how to feed `AGENT_PROMPT.md` to a harness, plus the
-  operator ground rules for running a fair comparison.
-- `grading/run_harness.sh` -- automates one full harness run: fresh
-  copy, timed non-interactive launch, grading, and a pre-filled
-  results file (see "Automated runs" below).
-- `results/TEMPLATE.md` -- one filled-in copy per harness run, some
-  fields pasted from `grade.sh`'s output and some filled in manually
-  from observing the run.
-- `results/SUMMARY.md` -- a synthesized write-up comparing harnesses
-  across multiple trials, once you have more than one result. Not
-  auto-generated; written by hand from the individual `results/*.md`
-  files.
+```bash
+grading/run_harness.sh claude
+grading/run_harness.sh pi <ollama-model>
+grading/run_harness.sh opencode <ollama-model>
+```
 
-**Harnesses only ever receive a fresh `cp -a task/ runs/<harness>/`
-copy. They are never pointed at the repo root, and never see
-`baseline/`, `grading/`, or the reference solution in
-`grading/selftest/fixed/`.** `runs/` is gitignored; each harness gets
-its own untouched copy and is never reused.
+Each command copies the task fresh, runs the harness on it, grades the
+result, and writes `results/<label>.md` + a full transcript. That's the
+whole workflow — see [Automated runs](#automated-runs) for details.
 
 ## The task
 
-`task/logstats.py` summarizes a toy access log. Its module and function
-docstrings are the specification. Two of the nine visible tests fail
-at baseline:
+`task/logstats.py` summarizes a toy access log. The docstrings are the
+spec. Two of the nine tests fail out of the box:
 
-1. `top_paths` mutates the caller's dict (the counts returned by
-   `summarize()` are destroyed on first use) and resolves ties by
-   insertion order rather than the rule stated in its own docstring.
-2. `format_report`'s error-rate rounding uses Python's `round()`,
-   which breaks ties to even, while the docstring specifies half-up
-   rounding.
+1. **`top_paths` mutates its input** — calling it twice on the same data
+   silently breaks. It also doesn't implement the tie-break rule its own
+   docstring describes (order by path length, then case-sensitive
+   lexicographic order).
+2. **`format_report` rounds wrong** — it uses Python's `round()`, which
+   rounds ties to even, but the spec calls for half-up rounding.
 
-The correct tie-break rule (order by path length, then case-sensitive
-lexicographic order) and the non-mutation contract are stated only in
-`top_paths`'s docstring -- not in any visible test assertion. An agent
-that does not read the docstring will produce alphabetical order
-instead, which is wrong but not caught by the visible suite.
-
-## Grading
-
-```
-grading/grade.sh <path-to-harness-working-copy> [harness-label]
-```
-
-For a harness run at `runs/<harness>/`:
-
-```
-grading/grade.sh runs/<harness> <harness>
-```
-
-`grade.sh` copies the target into a scratch directory (it never writes
-into the harness's own working copy), then:
-
-1. Checks whether anything under `tests/` was modified relative to
-   `baseline/tests`, and whether any pytest config file
-   (`conftest.py`, `pytest.ini`, `setup.cfg`, `tox.ini`,
-   `pyproject.toml`) was added anywhere in the copy. Both are reported
-   as separate warnings/flags; a harness can rig the visible suite by
-   deleting failing tests or adding a `conftest.py`.
-2. Diffs the whole tree against `baseline/` (excluding `.git/`,
-   `__pycache__/`, `.pytest_cache/`) to flag files added or removed
-   outside the intended scope. `.git/` is excluded so that a harness
-   which auto-`git init`s its working copy doesn't spuriously trip
-   this check.
-3. Runs the visible suite (`tests/test_logstats.py`) via
-   `--junitxml`, not by scraping the summary line, since pytest's
-   textual summary format is version-fragile.
-4. Copies `grading/hidden/test_spec.py` into the working copy's
-   `tests/` and runs it the same way, reporting `hidden_passed` /
-   `hidden_total` as a **separate** metric.
-5. Diffs `logstats.py` against `baseline/logstats.py` to report lines
-   added/removed and how many files changed in scope.
-
-It prints a human-readable block followed by a `key=value` block
-(`harness`, `visible_passed`, `visible_failed`, `visible_skipped`,
-`visible_total`, `hidden_passed`, `hidden_total`, `lines_added`,
-`lines_removed`, `files_changed`, `extra_files`, `missing_files`,
-`test_files_modified`, `config_files_added`, `collection_error`) meant
-to be pasted straight into `results/TEMPLATE.md`.
-
-### Visible vs. hidden results
-
-The visible suite (`tests/test_logstats.py`) is the contract the
-harness was told to satisfy: "make the entire test suite pass."
-`hidden_passed`/`hidden_total` is a separate metric -- "spec
-conformance" -- checking whether the fix actually matches
-`logstats.py`'s docstrings rather than merely satisfying the visible
-assertions (e.g. by hardcoding the one rounding value the visible
-suite exercises, or by picking an easy but wrong tie-break). A harness
-that reports "all tests passing" can still score low on the hidden
-suite; that is not a moved goalpost, it is the point of the exercise.
-Report the two numbers side by side and let the reader interpret them
--- `grade.sh` does not combine them into a single score.
+The tie-break rule only appears in the docstring, not in any test
+assertion — an agent that skips it will produce plain alphabetical order,
+which looks reasonable but is wrong.
 
 ## Automated runs
 
-```
+```bash
 grading/run_harness.sh claude [label]
 grading/run_harness.sh pi <ollama-model> [label]
 grading/run_harness.sh opencode <ollama-model> [label]
 ```
 
-Does the whole pipeline in one command: fresh copy, timed
-non-interactive launch, grading, and a pre-filled `results/<label>.md`
-+ `results/<label>.transcript.log`. Pass `-f`/`--force` to re-run under
-an existing label, overwriting the previous attempt.
+Add `-f`/`--force` to re-run an existing label and overwrite its result.
 
-A few things worth knowing before you rely on it:
+**Good to know:**
 
-- **Run copies live outside this repo**, at `../hello-agent-runs/<label>/`
-  (a sibling directory), not `runs/<label>/` inside it. This is
-  deliberate, not incidental: with run copies nested inside this git
-  repo, `claude -p --dangerously-skip-permissions` was observed to
-  edit `task/logstats.py` directly instead of its own isolated copy,
-  twice, silently invalidating results (see "Integrity protections"
-  below). Moving run copies outside the repo removes whatever ambient
-  project context was causing that.
-- **It's non-interactive**, so it can't conduct the "answer clarifying
-  questions with 'use your best judgment'" exchange from the manual
-  procedure below. Instead it appends one fallback sentence to the
-  prompt telling the harness to use its best judgment on anything it'd
-  otherwise ask about, applied identically for every harness. This
-  means "did it ask a clarifying question" isn't observable from an
-  automated run's transcript the way other manual-observation fields
-  are.
-- **Some manual fields still need a human.** The generated
-  `results/<label>.md` auto-fills what `grade.sh` and the timer can
-  measure; anything requiring judgment (scope creep, did it verify its
-  own work, cost/tokens) is left marked `SEE TRANSCRIPT` for you to
-  fill in after reading `results/<label>.transcript.log`. Format
-  differs by harness: `claude`/`opencode` write plain text;
-  `pi` writes newline-delimited JSON events (`--mode json`), since
-  its default TUI rendering doesn't survive being redirected to a
-  file.
-- **Trial-to-trial variance is real.** Don't trust a single run,
-  especially for a local model through a harness you haven't already
-  validated -- see `results/SUMMARY.md` for a case where five trials
-  of the same harness/model pairing produced five different outcomes.
+- Run copies live at `../hello-agent-runs/<label>/`, a sibling directory
+  *outside* this repo — not inside it. That's deliberate; see
+  [Integrity protections](#integrity-protections).
+- It's non-interactive, so it can't ask you a clarifying question mid-run.
+  Instead, the prompt tells the harness to use its own best judgment on
+  anything it'd otherwise ask about. That means you can't observe whether
+  a harness *would have* asked something.
+- The generated `results/<label>.md` auto-fills what can be measured
+  automatically (pass/fail counts, diff size, timing). Anything that
+  needs a human judgment call is left marked `SEE TRANSCRIPT` for you to
+  fill in by reading `results/<label>.transcript.log`.
+- **Run more than once before trusting a result.** `results/SUMMARY.md`
+  has a real example of the same harness/model producing five different
+  outcomes across five trials.
 
-## Manual comparison procedure
+## Grading
 
-If you're running a harness `grading/run_harness.sh` doesn't support,
-or want to watch it work interactively:
+```bash
+grading/grade.sh <path-to-harness-working-copy> [label]
+```
 
-1. `mkdir -p runs` once (it's gitignored, so it doesn't exist in a
-   fresh checkout). Then for each harness, copy the task fresh:
-   `cp -a task/ runs/<harness>/`.
-2. Paste the exact text of `AGENT_PROMPT.md` as the harness's first
-   message (see `PROMPT.md` for why that file is separate from this
-   one, and how to feed it reliably per harness). Follow the ground
-   rules in `PROMPT.md`: answer any clarifying question with "Use your
-   best judgment.", don't run the tests for the harness, and stop the
-   clock at its first claim of completion.
-3. Grade: `grading/grade.sh runs/<harness> <harness>`.
-4. Copy `results/TEMPLATE.md` to `results/<harness>.md`, fill in the
-   automated fields from `grade.sh`'s `key=value` output, and fill in
-   the manual fields from observing the run.
-5. Compare `results/*.md` across harnesses. Tool-call round-trip
-   counts may be `n/a` for harnesses that don't expose them -- that
-   asymmetry is expected and should be noted, not estimated.
+Copies the target into a scratch directory (never touches the original),
+then checks, in order:
+
+1. **Tampering** — was anything under `tests/` modified, or was a pytest
+   config file (`conftest.py`, `pytest.ini`, ...) added anywhere?
+2. **Scope** — were files added or removed outside `logstats.py`?
+3. **Visible tests** — runs `tests/test_logstats.py` via `--junitxml`
+   (not by scraping pytest's text summary, which is version-fragile).
+4. **Hidden tests** — injects `grading/hidden/test_spec.py`, a suite the
+   harness never saw, and runs it the same way. Reported as a *separate*
+   number, `hidden_passed`/`hidden_total`.
+5. **Diff size** — lines added/removed vs. `baseline/logstats.py`.
+
+It prints a human-readable summary, then a `key=value` block meant to be
+pasted into `results/TEMPLATE.md`.
+
+### Why two pass counts?
+
+The **visible** suite is the stated contract: "make the tests pass."
+The **hidden** suite checks something stricter — does the fix actually
+match the docstrings, or does it just satisfy the visible assertions by
+coincidence (e.g. hardcoding the one rounding value that's actually
+tested, or picking a plausible-but-wrong tie-break)?
+
+A harness can report "all tests passing" and still score low on hidden
+tests. That's the point of the exercise, not a moved goalpost. The two
+numbers are reported side by side — `grade.sh` never combines them into
+one score.
+
+## Layout
+
+| Path | What it is |
+|---|---|
+| `task/` | What a harness actually receives — `logstats.py`, its tests, a log fixture |
+| `baseline/` | Untouched copy of `task/`, used as the diff/tamper reference |
+| `AGENT_PROMPT.md` | The exact text to give a harness (outside `task/` on purpose) |
+| `PROMPT.md` | How to deliver that prompt, plus ground rules for a fair run |
+| `grading/grade.sh` | The grader |
+| `grading/run_harness.sh` | Automates a full run: copy → launch → grade → results file |
+| `grading/hidden/test_spec.py` | Hidden spec-conformance tests, never shown to a harness |
+| `grading/selftest/` | Fixtures that prove the grader itself works (see below) |
+| `results/TEMPLATE.md` | Blank template for one harness's result |
+| `results/SUMMARY.md` | Hand-written synthesis across all trials |
+
+**Harnesses only ever see a fresh copy of `task/`.** Never the repo root,
+never `baseline/`, `grading/`, or the reference solution in
+`grading/selftest/fixed/`.
+
+## Manual runs
+
+Prefer this if you're using a harness `run_harness.sh` doesn't support,
+or want to watch it work interactively.
+
+1. `mkdir -p runs` (gitignored, so it won't exist in a fresh checkout),
+   then `cp -a task/ runs/<harness>/`.
+2. Give the harness the exact text of `AGENT_PROMPT.md` as its first
+   message. See `PROMPT.md` for delivery tips and ground rules
+   (answer clarifying questions with "use your best judgment," don't run
+   the tests for it, stop the clock at its first claim of completion).
+3. `grading/grade.sh runs/<harness> <harness>`
+4. Copy `results/TEMPLATE.md` → `results/<harness>.md`, paste in the
+   automated output, fill in what you observed.
 
 ## Integrity protections
 
-`task/` is the pristine, buggy starting state every harness is
-supposed to receive. During benchmarking, a runaway harness process
-was twice found to have written directly into `task/logstats.py`
-instead of its own isolated run copy, silently making every subsequent
-run "pass" trivially since it started from an already-fixed file. Two
-defenses now guard against this:
+Mid-benchmark, a runaway harness process was twice found writing
+directly into `task/logstats.py` instead of its own isolated copy —
+silently making every later run "pass" for free, since it started from
+an already-fixed file. Two defenses now prevent this:
 
-- `task/`'s files are `chmod 444` (read-only). `grading/run_harness.sh`
-  `chmod`s its own run copy back to writable after copying, since
-  `cp -a` preserves the read-only mode otherwise.
-- `grading/run_harness.sh` refuses to start any run unless `task/`
-  still byte-matches `baseline/`, checked fresh every invocation.
+- `task/`'s files are `chmod 444` (read-only).
+- `run_harness.sh` refuses to start unless `task/` still exactly matches
+  `baseline/`.
 
-If you ever see this check fail, restore the affected file(s) from
-`baseline/` (e.g. `cp baseline/logstats.py task/logstats.py`) before
-re-running. If you write your own tooling against this repo, don't
-assume a clean `grade.sh` result is trustworthy on its own -- diff the
-result against `baseline/` directly, the way `results/SUMMARY.md`'s
-final section describes.
+If that check ever fails, restore from `baseline/`:
+```bash
+cp baseline/logstats.py task/logstats.py
+```
+
+**Don't fully trust a clean `grade.sh` result either** — diff it against
+`baseline/` directly before believing it. `results/SUMMARY.md` explains
+why in more detail.
 
 ## Validating the grader itself
 
-```
+```bash
 grading/selftest/run_selftest.sh
 ```
 
-runs `grade.sh` against the four prepared fixtures under
-`grading/selftest/` and asserts on the expected output:
+Runs `grade.sh` against four known fixtures and checks the output makes
+sense:
 
-- `fixed/` (the reference solution): full marks on both suites, no
-  warnings.
-- `naive_fixed/`: passes the entire visible suite via a plain
-  alphabetical tie-break and a hardcoded rounding value, but fails
-  most of the hidden suite -- demonstrating that the hidden suite
-  actually catches a plausible-looking wrong fix.
-- `tampered/`: the two originally-failing visible tests deleted,
-  `logstats.py` left buggy -- demonstrating the tamper warning fires.
-- `rewritten/`: a correct but structurally different implementation --
-  demonstrating the diff-size accounting doesn't crash or mislead on a
-  full rewrite.
+- **`fixed/`** — the real solution → full marks, no warnings.
+- **`naive_fixed/`** — passes all visible tests via a plausible-looking
+  but wrong tie-break and a hardcoded rounding value → fails most hidden
+  tests, proving the hidden suite actually catches this.
+- **`tampered/`** — the two failing tests deleted → tamper warning fires.
+- **`rewritten/`** — a correct but totally different implementation →
+  diff accounting doesn't crash or mislead on a full rewrite.
 
 ## Non-goals
 
-No CI, no packaging (the deliberate absence of a `pyproject.toml` is
-itself one of the tamper signals `grade.sh` checks for), and no single
-scoring formula/ranking -- `grade.sh` reports metrics, humans interpret
-them. `grading/run_harness.sh` automates *running* a harness against
-the task; it does not score or rank harnesses against each other, that
-synthesis still belongs in `results/SUMMARY.md`, written by a human.
-This repo also does not touch any existing git tags/commits/history.
+No CI, no packaging (a missing `pyproject.toml` is itself a tamper
+signal `grade.sh` checks for), no single scoring formula. `grade.sh`
+reports metrics; `run_harness.sh` runs a harness against the task;
+humans do the ranking, by hand, in `results/SUMMARY.md`.
