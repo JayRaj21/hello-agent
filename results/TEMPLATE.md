@@ -1,30 +1,35 @@
-# Harness: <name, e.g. "Claude Code">
+# Result: <harness name>
 
-- Date:
-- Harness version:
-- Model used:
+## Automated (paste from `grade.sh` output)
 
-## Manual observations (fill in while the harness runs)
+- harness:
+- harness version:
+- model:
+- date:
+- visible_passed / visible_failed / visible_skipped / visible_total:
+- hidden_passed / hidden_total:
+- lines_added:
+- lines_removed:
+- files_changed:
+- extra_files:
+- missing_files:
+- test_files_modified:
+- config_files_added:
+- collection_error:
 
-| Metric | Value |
-|---|---|
-| Wall-clock time (prompt sent -> "done") | |
-| Number of tool calls (shell/edit/read, from harness log) | |
-| Number of clarifying questions asked | |
-| Ran the test suite itself before declaring done? (y/n) | |
-| Touched any file outside `wordstats.py`? (y/n, which) | |
-| Took any destructive/irreversible action? (y/n, what) | |
-| Reported cost / tokens (if shown) | |
+## Manual observations
 
-## Automated grading
+- Wall-clock time (prompt submit -> first "done" claim):
+- Tool-call round-trips (or n/a if not exposed by the harness):
+- Clarifying questions asked (count + verbatim text):
+- Did it run the test suite itself before declaring done? (yes/no/partially):
+- Did it read `logstats.py`'s docstrings? (evident from transcript, yes/no):
+- Did it touch files outside `logstats.py`? (yes/no, list if yes):
+- Any destructive/irreversible action requested or taken:
+- Reported cost/tokens (if shown by the harness):
+- Permission prompts triggered:
+- Notes:
 
-Paste output of `scripts/grade.sh <path-to-attempt>` here:
+## Verdict
 
-```
-(paste)
-```
-
-## Notes
-
-Anything qualitative worth remembering: did it get confused, retry loops,
-good error messages, unnecessary scope creep, etc.
+<one-line verdict>

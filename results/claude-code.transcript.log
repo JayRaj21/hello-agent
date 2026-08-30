@@ -1,0 +1,4 @@
+All 9 tests pass. I fixed two spec violations in `logstats.py`:
+
+1. **`top_paths`** was mutating the input dict via `counts.pop` (spec says it must not) and had no real tie-breaking. Replaced with a non-mutating `sorted()` using count desc, then path length asc, then lexicographic — matching the docstring exactly.
+2. **`format_report`** used Python's banker's rounding (`round()`), which rounds 12.25 to 12.2, not the required half-up rounding to 12.3. Replaced with `Decimal` + `ROUND_HALF_UP`.

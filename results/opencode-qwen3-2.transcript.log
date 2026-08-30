@@ -1,0 +1,10 @@
+[0m
+> build · qwen3:14b
+[0m
+[0m✗ [0mRead  failed[90m [file_path=logstats.py, directory=.][0m
+[91m[1mError: [0mThe read tool was called with invalid arguments: SchemaError(Missing key
+  at ["filePath"]).
+Please rewrite the input so it satisfies the expected schema.
+[93m[1m! [0mpermission requested: external_directory (/*); auto-rejecting
+[0m✗ [0mRead /example.txt failed[90m [limit=1000, offset=0][0m
+[91m[1mError: [0mThe user rejected permission to use this specific tool call.

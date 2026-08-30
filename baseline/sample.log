@@ -1,0 +1,5 @@
+127.0.0.1 GET /index.html 200 512
+127.0.0.1 GET /search?q=cats 200 1024
+127.0.0.1 GET /missing 404 128
+
+127.0.0.1 POST /login 500 64
