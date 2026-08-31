@@ -6,7 +6,7 @@ Give different AI coding-agent harnesses (Claude Code, `pi`, `opencode`, ...)
 the exact same small buggy task, then grade the result with a script instead
 of eyeballing it.
 
-📊 **Results so far:** [`results/SUMMARY.md`](results/SUMMARY.md)
+**Results so far:** [`results/SUMMARY.md`](results/SUMMARY.md)
 
 ## Quickstart
 
