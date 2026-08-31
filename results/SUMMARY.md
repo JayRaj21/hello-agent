@@ -51,6 +51,27 @@ describable "typical" behavior for this harness/model pairing --
 it ranges from correct-but-destructive to complete task
 misunderstanding, with no consistent failure mode.
 
+### `pi` + other local models (single trial each)
+
+Earlier smoke testing confirmed `devstral:24b`, `llama3.1:8b`, and
+`granite4:7b-a1b-h` can all call tools correctly on a trivial one-shot
+task. None of them could actually do this one.
+
+| Model | Visible (9) | Hidden (3) | Diff | Time | Behavior |
+|---|---|---|---|---|---|
+| `devstral:24b` | 7/9 | 0/3 | +0/-0 | 107.4s | Read the file, gave a generic (and incomplete -- omits the tie-break clause and both bugs) code summary instead of fixing anything |
+| `llama3.1:8b` | 7/9 | 0/3 | +0/-0 | 19.6s | Copied `pi`'s tool-usage placeholder text (`<add code that makes test suite pass...>`) literally into its first `edit` call, which failed; then, after correctly reading the real file, degenerated into incoherent garbled text mixing broken syntax and random Unicode symbols |
+| `granite4:7b-a1b-h` | 7/9 | 0/3 | +0/-0 | 9.0s | Read the real file, then fabricated a fluent, confident description of a *completely different, imaginary* program (invented functions like `parse_params`, `create_directory`, `move_file` that don't exist anywhere in `logstats.py`) |
+
+**Behavior:** all three failed to do any real work, but in three
+distinct ways -- incomplete-but-genuine summary, tool-call
+misunderstanding cascading into incoherence, and outright fabrication.
+None resembles `pi`'s stable "fix the hard bug, skip the easy one"
+pattern with `qwen3:14b` -- that pattern is specific to a model capable
+enough to attempt the task at all. `qwen3:14b` remains the only local
+model that has done *any* real work on this task through any harness
+tested so far. (Single trial each -- see caveats.)
+
 ## Cross-cutting conclusions
 
 - **Claude Code is the clear leader** on every axis measured here:
@@ -84,13 +105,29 @@ misunderstanding, with no consistent failure mode.
   problem, it looks like a general fragility in how `opencode`'s tool
   schema is presented to locally-hosted models.
 
+## Not yet covered
+
+- **Codex is untested.** Not installed on the machine these trials ran
+  on, and running it needs either an OpenAI API key or an interactive
+  `codex login` flow that only a human can complete. `grading/run_harness.sh`
+  has no `codex` branch yet. If you set it up, adding one follows the
+  same pattern as the existing `claude`/`pi`/`opencode` branches.
+- **`devstral`/`llama3.1`/`granite4` have only one trial each, all
+  through `pi`.** See "`pi` + other local models" above -- all three
+  failed to do real work in their one trial. That's a real result, not
+  a placeholder, but N=1 each means it's not yet known whether that's
+  their stable behavior or one bad roll. None has been tried through
+  `opencode` at all.
+
 ## Caveats
 
-- **Sample sizes are small.** 2 trials for Claude Code and `pi`, 5 for
-  `opencode`. The two low-N harnesses happened to be highly
-  consistent, so 2 trials feels more trustworthy for them than it
-  would in isolation -- but that's still not proof of a hard
-  guarantee.
+- **Sample sizes are small.** 2 trials for Claude Code + `qwen3:14b`
+  via `pi`, 5 for `opencode` + `qwen3:14b`, 1 each for `devstral`,
+  `llama3.1:8b`, and `granite4:7b-a1b-h` via `pi`. The two 2-trial rows
+  happened to be highly consistent, so 2 trials feels more trustworthy
+  for them than it would in isolation; the three 1-trial rows are the
+  least trustworthy numbers in this document -- treat them as "this
+  happened once," not "this is what always happens."
 - **Timing is not a fair cross-harness comparison.** Both local-model
   runs showed ~33%/67% GPU/CPU split (8GB VRAM insufficient to hold
   `qwen3:14b` fully), so their ~3-8 minute times mostly reflect this
