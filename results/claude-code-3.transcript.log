@@ -1,0 +1,6 @@
+All 9 tests pass now. Fixed three bugs in `logstats.py`:
+
+- `top_paths`: was mutating the input dict via `counts.pop()` and didn't implement the documented tie-break rule (length, then case-sensitive lexicographic). Replaced with a non-destructive `sorted()` call.
+- `format_report`: used Python's `round()`, which does banker's rounding (e.g. 12.25 → 12.2), but the spec requires round-half-up (12.25 → 12.3). Switched to `Decimal` with `ROUND_HALF_UP`.
+
+Done — the full suite passes with no changes outside `logstats.py`.

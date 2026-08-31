@@ -14,26 +14,37 @@ before reading anything here as settled fact.
 |---|---|---|---|---|
 | 1 (`claude-code`) | 9/9 | 3/3 | +7/-7 | 18.1s |
 | 2 (`claude-code-2`) | 9/9 | 3/3 | +6/-6 | 25.9s |
+| 3 (`claude-code-3`) | 9/9 | 3/3 | +7/-7 | 33.5s |
 
-**Behavior:** solved the task correctly and completely both times, with
-a small, surgical diff. Used `Decimal`/`ROUND_HALF_UP` for the rounding
-bug and a non-mutating `sorted()` with the exact three-key tie-break
-(count desc, length asc, lexicographic) for `top_paths`, matching the
-docstring precisely both trials. By far the fastest of the three.
+**Behavior:** solved the task correctly and completely all three
+times, with a small, surgical diff. Used `Decimal`/`ROUND_HALF_UP` for
+the rounding bug and a non-mutating `sorted()` with the exact
+three-key tie-break (count desc, length asc, lexicographic) for
+`top_paths`, matching the docstring precisely every trial. By far the
+fastest and most consistent of any harness/model pairing tested.
 
 ### `pi` + `qwen3:14b` (local, via Ollama)
 
-| Trial | Visible (9) | Hidden (3) | Diff | Time |
-|---|---|---|---|---|
-| 1 (`pi-qwen3-14b`) | 8/9 | 2/3 | +6/-5 | 334.1s |
-| 2 (`pi-qwen3-2`) | 8/9 | 2/3 | +6/-5 | 194.6s |
+| Trial | Visible (9) | Hidden (3) | Diff | Time | Tool calls |
+|---|---|---|---|---|---|
+| 1 (`pi-qwen3-14b`) | 8/9 | 2/3 | +6/-5 | 334.1s | 3: read, edit, bash (pytest attempt failed, gave up) |
+| 2 (`pi-qwen3-2`) | 8/9 | 2/3 | +6/-5 | 194.6s | 2: read, edit (no verification attempted) |
+| 3 (`pi-qwen3-3`) | 7/9 | 0/3 | +0/-0 | 219.2s | 1: read only -- reasoned to the *correct* fix internally, then the turn ended before it ever called `edit` |
 
-**Behavior:** identical outcome both trials. Correctly fixed
-`top_paths` -- non-mutating, exact correct tie-break sort key -- but
-never touched `format_report` at all, leaving the banker's-rounding
-bug (`round()` instead of half-up) completely unaddressed. Reads the
-harder of the two bugs correctly and consistently misses the easier
-one; a stable, reproducible partial-completion pattern, not a fluke.
+**Behavior:** not the stable pattern it looked like after two trials.
+Trials 1-2 landed on an identical partial fix (`top_paths` correct,
+`format_report` untouched). Trial 3 broke that pattern entirely --
+its internal reasoning independently derived the same correct
+`top_paths` fix as the other two trials, including the exact right
+sort key, but the turn ended before it ever emitted the `edit` call,
+so nothing was actually written. It also explicitly reasoned that it
+"can't execute commands," a hallucinated limitation contradicted by
+trial 1 successfully using `bash` on this exact model/harness pairing.
+Three trials, three different tool-call counts (3, 2, 1) and three
+different outcomes. The genuinely reproducible fact across all three
+is narrower than first thought: when it does act, it never gets
+`format_report` right -- but *whether* it acts at all isn't
+reliable.
 
 ### `opencode` + `qwen3:14b` (local, via Ollama)
 
@@ -66,38 +77,39 @@ task. None of them could actually do this one.
 **Behavior:** all three failed to do any real work, but in three
 distinct ways -- incomplete-but-genuine summary, tool-call
 misunderstanding cascading into incoherence, and outright fabrication.
-None resembles `pi`'s stable "fix the hard bug, skip the easy one"
-pattern with `qwen3:14b` -- that pattern is specific to a model capable
-enough to attempt the task at all. `qwen3:14b` remains the only local
-model that has done *any* real work on this task through any harness
-tested so far. (Single trial each -- see caveats.)
+None resembles `pi` + `qwen3:14b`'s partial-fix pattern from trials 1-2
+-- that pattern needs a model capable enough to attempt the task at
+all, which these three didn't manage even once. `qwen3:14b` remains
+the only local model that has done *any* real work on this task
+through any harness tested so far. (Single trial each -- see caveats.)
 
 ## Cross-cutting conclusions
 
 - **Claude Code is the clear leader** on every axis measured here:
-  correctness, diff precision, and speed (speed comparison is not
-  fully apples-to-apples -- see caveats).
-- **Same local model, wildly different reliability depending on
-  harness.** `qwen3:14b` under `pi` is boringly consistent (same
-  partial result twice). The identical model under `opencode` is
-  chaotic (five different outcomes in five tries). The harness
-  materially shapes not just whether the model succeeds, but *how* it
-  fails.
-- **`pi`'s failure mode is an omission, not a guess.** It's not that
-  it doesn't understand `format_report`'s bug -- it simply never
-  engages with that function at all, both times. Worth checking in a
-  future trial whether a more insistent prompt ("fix *all* the
-  failures") changes this, since the current prompt already says
-  "make the entire test suite pass." Its per-trial transcripts (only
-  possible to inspect for `pi`, since its `--mode json` output gives a
-  tool-by-tool trace that `claude -p` text mode doesn't) show it isn't
-  purely careless either: trial 1 actually tried to self-verify by
-  running `bash "cd tests && python -m pytest"`, which appears to have
-  failed on a `python`-vs-`python3` environment issue, and it gave up
-  rather than retrying -- telling the user to go check instead of
-  investigating itself. Trial 2 didn't attempt verification at all, yet
-  stated success more confidently than trial 1's hedged conclusion.
-  Confidence of wording did not track actual thoroughness here.
+  correctness (3/3 trials perfect), diff precision, and speed (speed
+  comparison is not fully apples-to-apples -- see caveats). It's also
+  the only harness/model pairing tested so far with zero variance
+  across trials.
+- **Same local model, unreliable under both harnesses tested, just in
+  different ways.** `qwen3:14b` under `opencode` is chaotic (five
+  different outcomes in five tries). Under `pi` it looked stable after
+  two trials (identical partial fix twice) but a third trial broke
+  that: same correct reasoning internally, zero actual edits made. The
+  harness materially shapes *how* the model fails, but neither harness
+  tested reduces `qwen3:14b` to a single predictable failure mode.
+- **`pi`'s trials show whether it acts is not reliable, even when its
+  reasoning is.** Its per-trial transcripts (only possible to inspect
+  for `pi`, since its `--mode json` output gives a tool-by-tool trace
+  that `claude -p` text mode doesn't) show three different relationships
+  between reasoning and action: trial 1 acted and tried to self-verify
+  (`bash "cd tests && python -m pytest"`, which failed on a
+  `python`-vs-`python3` environment issue, then gave up rather than
+  retrying); trial 2 acted with no verification attempt at all, stated
+  success confidently; trial 3 reasoned its way to the *same correct
+  fix* as the other two trials, in detail, and then never emitted the
+  `edit` call -- the turn simply ended. Confidence of wording, and even
+  correctness of internal reasoning, did not reliably predict whether
+  real work got done.
 - **`opencode`'s tool-call schema is a recurring failure surface.**
   The `filePath`-key `SchemaError` seen in trial 2 here also appeared
   with `llama3.1:8b` and `granite4:7b-a1b-h` in earlier smoke testing
@@ -121,13 +133,15 @@ tested so far. (Single trial each -- see caveats.)
 
 ## Caveats
 
-- **Sample sizes are small.** 2 trials for Claude Code + `qwen3:14b`
-  via `pi`, 5 for `opencode` + `qwen3:14b`, 1 each for `devstral`,
-  `llama3.1:8b`, and `granite4:7b-a1b-h` via `pi`. The two 2-trial rows
-  happened to be highly consistent, so 2 trials feels more trustworthy
-  for them than it would in isolation; the three 1-trial rows are the
-  least trustworthy numbers in this document -- treat them as "this
-  happened once," not "this is what always happens."
+- **Sample sizes are still small.** 3 trials for Claude Code, 3 for
+  `pi` + `qwen3:14b`, 5 for `opencode` + `qwen3:14b`, 1 each for
+  `devstral`, `llama3.1:8b`, and `granite4:7b-a1b-h` via `pi`. Even 3
+  trials wasn't enough to safely call `pi` + `qwen3:14b` "consistent"
+  -- its third trial broke a pattern that 2 trials made look stable
+  (see above). Treat every number in this document, including the
+  Claude Code row, as provisional; the one-trial rows are the least
+  trustworthy of all -- "this happened once," not "this is what always
+  happens."
 - **Timing is not a fair cross-harness comparison.** Both local-model
   runs showed ~33%/67% GPU/CPU split (8GB VRAM insufficient to hold
   `qwen3:14b` fully), so their ~3-8 minute times mostly reflect this
