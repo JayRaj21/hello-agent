@@ -1,5 +1,7 @@
 # hello-agent
 
+[![selftest](https://github.com/JayRaj21/hello-agent/actions/workflows/selftest.yml/badge.svg)](https://github.com/JayRaj21/hello-agent/actions/workflows/selftest.yml)
+
 Give different AI coding-agent harnesses (Claude Code, `pi`, `opencode`, ...)
 the exact same small buggy task, then grade the result with a script instead
 of eyeballing it.
@@ -169,7 +171,16 @@ sense:
 
 ## Non-goals
 
-No CI, no packaging (a missing `pyproject.toml` is itself a tamper
-signal `grade.sh` checks for), no single scoring formula. `grade.sh`
-reports metrics; `run_harness.sh` runs a harness against the task;
-humans do the ranking, by hand, in `results/SUMMARY.md`.
+No packaging (a missing `pyproject.toml` is itself a tamper signal
+`grade.sh` checks for), no single scoring formula. `grade.sh` reports
+metrics; `run_harness.sh` runs a harness against the task; humans do
+the ranking, by hand, in `results/SUMMARY.md`.
+
+CI (`.github/workflows/selftest.yml`) only runs
+`grading/selftest/run_selftest.sh` on every push -- it checks that the
+grader itself still behaves correctly against known fixtures. It does
+**not** run any harness. That's still deliberately out of scope: a
+GitHub-hosted runner has no Ollama server, no GPU, and no way to
+interactively authenticate `claude`, so there's no way to run a real
+comparison trial in CI without a fundamentally different (and much
+more expensive) setup than this project needs.
