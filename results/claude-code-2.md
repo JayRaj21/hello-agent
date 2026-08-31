@@ -11,12 +11,12 @@
 | Metric | Value |
 |---|---|
 | Wall-clock time (prompt sent -> process exit) | 25.9s (automated) |
-| Number of tool calls (shell/edit/read, from transcript) | SEE TRANSCRIPT: results/claude-code-2.transcript.log |
-| Number of clarifying questions asked | N/A -- run was non-interactive with a "use your best judgment" fallback baked into the prompt; check transcript for whether it would have asked |
-| Ran the test suite itself before declaring done? (y/n) | SEE TRANSCRIPT |
-| Touched any file outside `logstats.py`? (y/n, which) | extra_files=0 missing_files=0 (cross-check with transcript) |
-| Took any destructive/irreversible action? (y/n, what) | SEE TRANSCRIPT |
-| Reported cost / tokens (if shown) | SEE TRANSCRIPT |
+| Number of tool calls (shell/edit/read, from transcript) | unknown -- `-p` text mode only returns the final response, not a tool-by-tool trace (see `claude-code.md` trial 1 for the same limitation) |
+| Number of clarifying questions asked | N/A -- run was non-interactive with a "use your best judgment" fallback baked into the prompt; not observable in text mode either way |
+| Ran the test suite itself before declaring done? (y/n) | unknown -- same transcript limitation; result is independently verified correct regardless |
+| Touched any file outside `logstats.py`? (y/n, which) | n (extra_files=0 missing_files=0) |
+| Took any destructive/irreversible action? (y/n, what) | n |
+| Reported cost / tokens (if shown) | not shown in text mode output |
 
 ## Automated grading
 
@@ -49,4 +49,7 @@ collection_error=no
 
 ## Notes
 
-(fill in after reading results/claude-code-2.transcript.log)
+Same correct outcome as trial 1: non-mutating `sorted()` tie-break for
+`top_paths`, `Decimal`/`ROUND_HALF_UP` for `format_report`. Slightly
+different variable naming/style from trial 1 but functionally
+identical fix. Second consecutive clean, complete result.

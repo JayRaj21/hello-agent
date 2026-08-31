@@ -11,12 +11,12 @@
 | Metric | Value |
 |---|---|
 | Wall-clock time (prompt sent -> process exit) | 247.3s (automated) |
-| Number of tool calls (shell/edit/read, from transcript) | SEE TRANSCRIPT: results/opencode-qwen3-5.transcript.log |
-| Number of clarifying questions asked | N/A -- run was non-interactive with a "use your best judgment" fallback baked into the prompt; check transcript for whether it would have asked |
-| Ran the test suite itself before declaring done? (y/n) | SEE TRANSCRIPT |
-| Touched any file outside `logstats.py`? (y/n, which) | extra_files=0 missing_files=0 (cross-check with transcript) |
-| Took any destructive/irreversible action? (y/n, what) | SEE TRANSCRIPT |
-| Reported cost / tokens (if shown) | SEE TRANSCRIPT |
+| Number of tool calls (shell/edit/read, from transcript) | 1: `Read logstats.py` -- no edit/write/bash call at all |
+| Number of clarifying questions asked | N/A -- run was non-interactive with a "use your best judgment" fallback baked into the prompt; transcript shows no attempt to ask one |
+| Ran the test suite itself before declaring done? (y/n) | n |
+| Touched any file outside `logstats.py`? (y/n, which) | n (extra_files=0 missing_files=0) |
+| Took any destructive/irreversible action? (y/n, what) | n |
+| Reported cost / tokens (if shown) | not shown in the captured transcript output |
 
 ## Automated grading
 
@@ -49,4 +49,11 @@ collection_error=no
 
 ## Notes
 
-(fill in after reading results/opencode-qwen3-5.transcript.log)
+The worst outcome of the five trials in terms of comprehension, though
+not in terms of grade: read the file, correctly summarized what it
+does at a surface level, then concluded "the script is **functionally
+correct**" and offered generic, unrelated style/performance suggestions
+(streaming large files, type hints, extracting magic numbers) instead
+of recognizing either actual bug. Never engaged with the fact that the
+prompt explicitly said some tests fail. No tool call beyond the initial
+read.

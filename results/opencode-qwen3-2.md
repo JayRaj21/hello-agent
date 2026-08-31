@@ -11,12 +11,12 @@
 | Metric | Value |
 |---|---|
 | Wall-clock time (prompt sent -> process exit) | 169.8s (automated) |
-| Number of tool calls (shell/edit/read, from transcript) | SEE TRANSCRIPT: results/opencode-qwen3-2.transcript.log |
-| Number of clarifying questions asked | N/A -- run was non-interactive with a "use your best judgment" fallback baked into the prompt; check transcript for whether it would have asked |
-| Ran the test suite itself before declaring done? (y/n) | SEE TRANSCRIPT |
-| Touched any file outside `logstats.py`? (y/n, which) | extra_files=0 missing_files=0 (cross-check with transcript) |
-| Took any destructive/irreversible action? (y/n, what) | SEE TRANSCRIPT |
-| Reported cost / tokens (if shown) | SEE TRANSCRIPT |
+| Number of tool calls (shell/edit/read, from transcript) | 2 attempted, 0 succeeded: `Read logstats.py` (malformed args, `SchemaError`), then `Read /example.txt` (hallucinated, out-of-scope path) |
+| Number of clarifying questions asked | N/A -- run was non-interactive with a "use your best judgment" fallback baked into the prompt; transcript shows no attempt to ask one |
+| Ran the test suite itself before declaring done? (y/n) | n -- never got past the initial failed read |
+| Touched any file outside `logstats.py`? (y/n, which) | n in effect (extra_files=0 missing_files=0, no write ever happened), but it did *attempt* to read `/example.txt`, a path outside the working directory that has nothing to do with this task -- correctly auto-rejected by opencode's permission system (`external_directory` request denied) |
+| Took any destructive/irreversible action? (y/n, what) | n -- the out-of-scope read attempt above was blocked before it could do anything, not something it actually accomplished |
+| Reported cost / tokens (if shown) | not shown in the captured transcript output |
 
 ## Automated grading
 
@@ -49,4 +49,13 @@ collection_error=no
 
 ## Notes
 
-(fill in after reading results/opencode-qwen3-2.transcript.log)
+Never actually got started: the first tool call was malformed (missing
+opencode's required `filePath` key), and rather than retrying with
+correct arguments, it appears to have hallucinated an entirely
+different, unrelated file path (`/example.txt`) to try instead --
+which was outside the working directory and correctly auto-rejected.
+Zero real work done. This is the same `filePath`-key `SchemaError` seen
+with `llama3.1:8b` and `granite4:7b-a1b-h` in earlier smoke testing
+(not `hello-agent`-task runs), suggesting it's a recurring fragility in
+how opencode presents its tool schema to locally-hosted models, not
+specific to this task or this model.

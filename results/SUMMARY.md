@@ -67,7 +67,16 @@ misunderstanding, with no consistent failure mode.
   engages with that function at all, both times. Worth checking in a
   future trial whether a more insistent prompt ("fix *all* the
   failures") changes this, since the current prompt already says
-  "make the entire test suite pass."
+  "make the entire test suite pass." Its per-trial transcripts (only
+  possible to inspect for `pi`, since its `--mode json` output gives a
+  tool-by-tool trace that `claude -p` text mode doesn't) show it isn't
+  purely careless either: trial 1 actually tried to self-verify by
+  running `bash "cd tests && python -m pytest"`, which appears to have
+  failed on a `python`-vs-`python3` environment issue, and it gave up
+  rather than retrying -- telling the user to go check instead of
+  investigating itself. Trial 2 didn't attempt verification at all, yet
+  stated success more confidently than trial 1's hedged conclusion.
+  Confidence of wording did not track actual thoroughness here.
 - **`opencode`'s tool-call schema is a recurring failure surface.**
   The `filePath`-key `SchemaError` seen in trial 2 here also appeared
   with `llama3.1:8b` and `granite4:7b-a1b-h` in earlier smoke testing

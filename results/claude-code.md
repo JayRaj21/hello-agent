@@ -11,12 +11,12 @@
 | Metric | Value |
 |---|---|
 | Wall-clock time (prompt sent -> process exit) | 18.1s (automated) |
-| Number of tool calls (shell/edit/read, from transcript) | SEE TRANSCRIPT: results/claude-code.transcript.log |
-| Number of clarifying questions asked | N/A -- run was non-interactive with a "use your best judgment" fallback baked into the prompt; check transcript for whether it would have asked |
-| Ran the test suite itself before declaring done? (y/n) | SEE TRANSCRIPT |
-| Touched any file outside `logstats.py`? (y/n, which) | extra_files=0 missing_files=0 (cross-check with transcript) |
-| Took any destructive/irreversible action? (y/n, what) | SEE TRANSCRIPT |
-| Reported cost / tokens (if shown) | SEE TRANSCRIPT |
+| Number of tool calls (shell/edit/read, from transcript) | unknown -- `-p` text mode (the default output format) only returns the final response, not a tool-by-tool trace like `pi`'s `--mode json` gives. Would need `--output-format=stream-json` on a future run to observe this. |
+| Number of clarifying questions asked | N/A -- run was non-interactive with a "use your best judgment" fallback baked into the prompt; not observable in text mode either way |
+| Ran the test suite itself before declaring done? (y/n) | unknown -- same transcript limitation. The diff is correct and the tests genuinely pass (verified independently against `baseline/`), so it either ran them or reasoned correctly without running them; text mode can't distinguish the two. |
+| Touched any file outside `logstats.py`? (y/n, which) | n (extra_files=0 missing_files=0) |
+| Took any destructive/irreversible action? (y/n, what) | n |
+| Reported cost / tokens (if shown) | not shown in text mode output |
 
 ## Automated grading
 
@@ -49,4 +49,10 @@ collection_error=no
 
 ## Notes
 
-(fill in after reading results/claude-code.transcript.log)
+Correctly fixed both bugs: non-mutating `sorted()` with the exact
+three-key tie-break for `top_paths`, and `Decimal`/`ROUND_HALF_UP` for
+`format_report`'s rounding. Diff is small and surgical (+7/-7). This
+transcript's thinness (see tool-call row above) is itself worth noting
+as a limitation of comparing across harnesses -- `pi`'s JSON transcript
+lets us see exactly what it verified and how; this one doesn't, despite
+producing the best result of the three harnesses tested.

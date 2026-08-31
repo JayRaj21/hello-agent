@@ -11,12 +11,12 @@
 | Metric | Value |
 |---|---|
 | Wall-clock time (prompt sent -> process exit) | 485.9s (automated) |
-| Number of tool calls (shell/edit/read, from transcript) | SEE TRANSCRIPT: results/opencode-qwen3-3.transcript.log |
-| Number of clarifying questions asked | N/A -- run was non-interactive with a "use your best judgment" fallback baked into the prompt; check transcript for whether it would have asked |
-| Ran the test suite itself before declaring done? (y/n) | SEE TRANSCRIPT |
-| Touched any file outside `logstats.py`? (y/n, which) | extra_files=0 missing_files=0 (cross-check with transcript) |
-| Took any destructive/irreversible action? (y/n, what) | SEE TRANSCRIPT |
-| Reported cost / tokens (if shown) | SEE TRANSCRIPT |
+| Number of tool calls (shell/edit/read, from transcript) | 1: `Read logstats.py` -- no edit/write/bash call at all |
+| Number of clarifying questions asked | N/A -- run was non-interactive with a "use your best judgment" fallback baked into the prompt; transcript shows no attempt to ask one |
+| Ran the test suite itself before declaring done? (y/n) | n -- never touched a test runner, or the file |
+| Touched any file outside `logstats.py`? (y/n, which) | n (extra_files=0 missing_files=0) |
+| Took any destructive/irreversible action? (y/n, what) | n |
+| Reported cost / tokens (if shown) | not shown in the captured transcript output |
 
 ## Automated grading
 
@@ -49,4 +49,11 @@ collection_error=no
 
 ## Notes
 
-(fill in after reading results/opencode-qwen3-3.transcript.log)
+Correctly diagnosed both bugs after reading the file, including the
+exact right tie-break sort key and a correct explanation of the
+mutation problem -- but never called `edit`/`write` to actually apply
+either fix, just wrote the fix out as a prose explanation with code
+blocks and stopped, as if answering "how would I fix this" rather than
+"fix this." The 485.9s runtime (longest of any trial, local or hosted)
+went entirely into generating an unusually long, detailed explanation,
+not into doing the task.
